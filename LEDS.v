@@ -1,12 +1,21 @@
 `timescale 1ns / 1ps
+
 module leds(
-    input clk, rst,
-    input [15:0] btns,
-    input [31:0] writeData, // not to be written
-    input writeEnable, // not to be used
+    input clk,
+    input rst,
+    input [31:0] writeData,
+    input writeEnable,
     input readEnable,
     input [29:0] memAddress,
-    input [15:0] switches,
-    output reg [31:0] readData
+    
+    output reg  [31:0] readData = 0, // not to be read       
+    output reg [15:0] leds
     );
+    
+    reg [7:0] ledData [3:0];
+    
+   
 endmodule
+
+
+
