@@ -2,7 +2,6 @@
 module FiniteStateMachine(
     input wire clk,
     input wire rst,
-    input wire start,
 
     // Memory bus
     output reg [29:0] memAddress,
@@ -12,13 +11,16 @@ module FiniteStateMachine(
     input  wire [31:0] readData
 );
 
-    // Encoding the states of the FSM.
-    parameter S0_IDLE      = 2'd0;
-    parameter S1_LOAD      = 2'd1;
-    parameter S2_COUNTDOWN = 2'd2;
+    // FSM States
+    parameter S0_WAIT      = 2'd0;
+    parameter S1_READ      = 2'd1;
+    parameter S2_LATCH     = 2'd2;
+    parameter S3_COUNTDOWN = 2'd3;
 
     reg [1:0] state, next_state;
+
     reg [15:0] count;
+    reg [15:0] switch_value;
 
     // Address map
     parameter SWITCH_ADDR = 30'h00000000;
@@ -27,73 +29,88 @@ module FiniteStateMachine(
     // State Register
     always @(posedge clk or posedge rst) begin
         if (rst)
-            state <= S0_IDLE;
+            state <= S0_WAIT;
         else
             state <= next_state;
     end
 
-    // Next State Logic
+    // Next-State Logic
     always @(*) begin
         next_state = state;
 
         case (state)
 
-            S0_IDLE:
-                if (start)
-                    next_state = S1_LOAD;
+            // Continuously checking switches
+            S0_WAIT:
+                next_state = S1_READ;
 
-            S1_LOAD:
-                next_state = S2_COUNTDOWN;
+            // Wait one cycle for valid readData
+            S1_READ:
+                if (readData[15:0] != 16'd0)
+                    next_state = S2_LATCH;
+                else
+                    next_state = S0_WAIT;
 
-            S2_COUNTDOWN:
+            // Capture switch value once
+            S2_LATCH:
+                next_state = S3_COUNTDOWN;
+
+            // Count down until zero
+            S3_COUNTDOWN:
                 if (count == 16'd0)
-                    next_state = S0_IDLE;
+                    next_state = S0_WAIT;
 
             default:
-                next_state = S0_IDLE;
-
+                next_state = S0_WAIT;
         endcase
     end
 
     // Output & Counter Logic
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            count       <= 16'd0;
-            memAddress  <= 30'd0;
-            readEnable  <= 0;
-            writeEnable <= 0;
-            writeData   <= 32'd0;
+            count        <= 16'd0;
+            switch_value <= 16'd0;
+            memAddress   <= 30'd0;
+            readEnable   <= 0;
+            writeEnable  <= 0;
+            writeData    <= 32'd0;
         end
         else begin
-
-            // Default bus signals
+            // Default read and write signals
             readEnable  <= 0;
             writeEnable <= 0;
 
             case (state)
 
-                S0_IDLE: begin
+                // Request switch value
+                S0_WAIT: begin
                     memAddress <= SWITCH_ADDR;
                     readEnable <= 1;
-                    count <= 16'd0;
                 end
 
-                S1_LOAD: begin
-                    count <= readData[15:0];
+                // Give bus one clock to respond
+                S1_READ: begin
+                    memAddress <= SWITCH_ADDR;
+                    readEnable <= 1;
                 end
 
-                S2_COUNTDOWN: begin
+                // Now data is valid, latch it
+                S2_LATCH: begin
+                    switch_value <= readData[15:0];
+                    count        <= readData[15:0];
+                end
+
+                // Countdown & LEDs
+                S3_COUNTDOWN: begin
                     memAddress  <= LED_ADDR;
-                    writeData   <= {16'd0, count};
                     writeEnable <= 1;
+                    writeData   <= {16'd0, count};
 
                     if (count > 0)
                         count <= count - 1;
                 end
-
             endcase
         end
     end
 
 endmodule
-
