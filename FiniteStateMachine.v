@@ -2,18 +2,29 @@
 module FiniteStateMachine(
     input wire clk,
     input wire rst,
-    input wire [15:0] switch_value,
-    output reg [15:0] count
+    input wire start,
+
+    // Memory bus
+    output reg [29:0] memAddress,
+    output reg readEnable,
+    output reg writeEnable,
+    output reg [31:0] writeData,
+    input  wire [31:0] readData
 );
 
-    // State encoding
+    // Encoding the states of the FSM.
     parameter S0_IDLE      = 2'd0;
     parameter S1_LOAD      = 2'd1;
     parameter S2_COUNTDOWN = 2'd2;
 
     reg [1:0] state, next_state;
+    reg [15:0] count;
 
-    // STATE REGISTER
+    // Address map
+    parameter SWITCH_ADDR = 30'h00000000;
+    parameter LED_ADDR    = 30'h00000004;
+
+    // State Register
     always @(posedge clk or posedge rst) begin
         if (rst)
             state <= S0_IDLE;
@@ -21,15 +32,14 @@ module FiniteStateMachine(
             state <= next_state;
     end
 
-    // NEXT STATE LOGIC
-
+    // Next State Logic
     always @(*) begin
         next_state = state;
 
         case (state)
 
             S0_IDLE:
-                if (switch_value != 16'd0)
+                if (start)
                     next_state = S1_LOAD;
 
             S1_LOAD:
@@ -45,26 +55,45 @@ module FiniteStateMachine(
         endcase
     end
 
-    // COUNTER LOGIC
-    
+    // Output & Counter Logic
     always @(posedge clk or posedge rst) begin
-        if (rst)
-            count <= 16'd0;
+        if (rst) begin
+            count       <= 16'd0;
+            memAddress  <= 30'd0;
+            readEnable  <= 0;
+            writeEnable <= 0;
+            writeData   <= 32'd0;
+        end
         else begin
+
+            // Default bus signals
+            readEnable  <= 0;
+            writeEnable <= 0;
+
             case (state)
 
-                S0_IDLE:
+                S0_IDLE: begin
+                    memAddress <= SWITCH_ADDR;
+                    readEnable <= 1;
                     count <= 16'd0;
+                end
 
-                S1_LOAD:
-                    count <= switch_value;  // latch switches
+                S1_LOAD: begin
+                    count <= readData[15:0];
+                end
 
-                S2_COUNTDOWN:
+                S2_COUNTDOWN: begin
+                    memAddress  <= LED_ADDR;
+                    writeData   <= {16'd0, count};
+                    writeEnable <= 1;
+
                     if (count > 0)
                         count <= count - 1;
+                end
 
             endcase
         end
     end
 
 endmodule
+
