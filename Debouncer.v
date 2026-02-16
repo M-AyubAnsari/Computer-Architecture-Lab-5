@@ -1,7 +1,11 @@
 `timescale 1ns / 1ps
-module debouncer(
+
+module debouncher(
     input clk,
-    input pbin,
-    output pbout
+    input pbin,     
+    output pbout  
     );
+
+  
+
 endmodule
