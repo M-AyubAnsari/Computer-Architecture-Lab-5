@@ -5,50 +5,45 @@ module testbench;
     reg clk;
     reg rst;
     reg [15:0] switches;
+    reg [15:0] btns;
     wire [15:0] leds_out;
 
-    // Instantiate DUT
     TopFSMModule uut (
         .clk(clk),
         .rst(rst),
         .switches(switches),
+        .btns(btns),
         .leds_out(leds_out)
     );
 
-    // Clock generation (100 MHz)
+    // 100 MHz clock
     always #5 clk = ~clk;
 
     initial begin
-        // Initialize
         clk = 0;
         rst = 1;
         switches = 0;
+        btns = 0;
 
-        // Release reset
         #20;
         rst = 0;
 
-        // Test 1: Load 5
+        // Load value 5
         switches = 16'd5;
-        #200;   // wait for countdown
+        #400;
 
-        // Clear switches (should be ignored during countdown)
-        switches = 0;
-        #100;
-
-        // Test 2: Load 3
-
+        // Load value 3
         switches = 16'd3;
-        #150;
+        #300;
 
-        // Test 3: Reset during countdown
+        // Reset during countdown
         switches = 16'd10;
-        #30;
-        rst = 1;   // reset mid-count
+        #50;
+        rst = 1;
         #20;
         rst = 0;
 
-        #100;
+        #300;
 
         $stop;
     end
